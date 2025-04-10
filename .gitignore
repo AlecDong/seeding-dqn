@@ -172,3 +172,8 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# training results
+*.png
+best_hyperparams.txt
+tuned_eval_stats.txt
