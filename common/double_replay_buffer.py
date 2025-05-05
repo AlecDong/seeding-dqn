@@ -275,9 +275,7 @@ class DoubleReplayBufferDQN(DoubleDQN):
     def _truncate_replay_buffer(self, buffer: DictReplayBuffer, size: int):
         """
         Truncate the replay buffer to a specific size. Takes the first `size` samples
-        and discards the rest.
-
-        If the buffer is smaller than `size`, it will be extended to `size`.
+        and discards the rest. Does not modify the buffer if it is already smaller than `size`.
 
         :param buffer: The replay buffer to truncate.
         :param size: The size to truncate to.
@@ -297,67 +295,42 @@ class DoubleReplayBufferDQN(DoubleDQN):
             buffer.rewards = buffer.rewards[:size].copy()
             buffer.dones = buffer.dones[:size].copy()
             buffer.timeouts = buffer.timeouts[:size].copy()
-        elif buffer.buffer_size < size:
-            # extend the buffer to the new size
-            pad_len = size - buffer.buffer_size
-            buffer.full = False
-
-            def pad_array(arr):
-                pad_shape = (pad_len,) + arr.shape[1:]
-                pad = np.zeros(pad_shape, dtype=arr.dtype)
-                return np.concatenate([arr, pad], axis=0)
-
-            for k in buffer.observations:
-                obs = buffer.observations[k]
-                next_obs = buffer.next_observations[k]
-
-                buffer.observations[k] = pad_array(obs)
-                buffer.next_observations[k] = pad_array(next_obs)
-
-            buffer.actions = pad_array(buffer.actions)
-            buffer.rewards = pad_array(buffer.rewards)
-            buffer.dones = pad_array(buffer.dones)
-            buffer.timeouts = pad_array(buffer.timeouts)
-
-            if buffer.full:
-                buffer.full = False
-                buffer.pos = buffer.buffer_size
-
-            buffer.buffer_size = size
     
     def load_replay_buffer(
         self,
         path: Union[str, pathlib.Path, io.BufferedIOBase],
-        truncate_last_traj: bool = True,
+        buffer: str = "secondary",
     ) -> None:
         """
         Load a replay buffer from a pickle file.
 
         :param path: Path to the pickled replay buffer.
-        :param truncate_last_traj: When using ``HerReplayBuffer`` with online sampling:
-            If set to ``True``, we assume that the last trajectory in the replay buffer was finished
-            (and truncate it).
-            If set to ``False``, we assume that we continue the same trajectory (same episode).
         """
-        old_size = self.replay_buffer.secondary_buffer.buffer_size
-        self.replay_buffer.secondary_buffer = load_from_pkl(path, self.verbose)
-        assert isinstance(self.replay_buffer.secondary_buffer, ReplayBuffer), "The replay buffer must inherit from ReplayBuffer class"
+        if buffer == "primary":
+            old_size = self.replay_buffer.primary_buffer.buffer_size
+        else:
+            old_size = self.replay_buffer.secondary_buffer.buffer_size
+
+        replay_buffer = load_from_pkl(path, self.verbose)
+        assert isinstance(replay_buffer, ReplayBuffer), "The replay buffer must inherit from ReplayBuffer class"
 
         self._truncate_replay_buffer(
-            self.replay_buffer.secondary_buffer, old_size
+            replay_buffer, old_size
         )
-        
-        print("Replay buffer loaded from:", path)
 
         # Backward compatibility with SB3 < 2.1.0 replay buffer
         # Keep old behavior: do not handle timeout termination separately
-        if not hasattr(self.replay_buffer.secondary_buffer, "handle_timeout_termination"):  # pragma: no cover
-            self.replay_buffer.secondary_buffer.handle_timeout_termination = False
-            self.replay_buffer.secondary_buffer.timeouts = np.zeros_like(self.replay_buffer.secondary_buffer.dones)
-
+        if not hasattr(replay_buffer, "handle_timeout_termination"):  # pragma: no cover
+            replay_buffer.handle_timeout_termination = False
+            replay_buffer.timeouts = np.zeros_like(replay_buffer.dones)
+        
         # Update saved replay buffer device to match current setting, see GH#1561
-        self.replay_buffer.secondary_buffer.device = self.device
-        self.replay_buffer.primary_buffer.device = self.device
+        replay_buffer.device = self.device
+        
+        if buffer == "primary":
+            self.replay_buffer.primary_buffer = replay_buffer
+        else:
+            self.replay_buffer.secondary_buffer = replay_buffer
 
 if __name__ == "__main__":
     # Example usage
