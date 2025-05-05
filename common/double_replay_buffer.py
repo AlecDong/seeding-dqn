@@ -1,8 +1,6 @@
 from stable_baselines3.common.buffers import ReplayBuffer, ReplayBufferSamples, DictReplayBuffer
-from stable_baselines3 import DQN
 from stable_baselines3.common.vec_env import VecNormalize
-
-from common.double_dqn import DoubleDQN
+from stable_baselines3.common.save_util import load_from_pkl
 
 import numpy as np
 import psutil
@@ -10,6 +8,10 @@ import warnings
 from typing import Any, Optional, Union
 import torch as th
 from gymnasium import spaces
+import io
+import pathlib
+
+from common.double_dqn import DoubleDQN
 
 class DoubleReplayBuffer:
     """
@@ -232,10 +234,6 @@ class DoubleReplayBuffer:
             }
         )
 
-
-import io
-import pathlib
-from stable_baselines3.common.save_util import load_from_pkl
 class DoubleReplayBufferDQN(DoubleDQN):
     """
     A DQN agent that uses a double replay buffer.
