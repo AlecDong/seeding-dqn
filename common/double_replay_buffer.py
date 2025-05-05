@@ -297,17 +297,22 @@ class DoubleReplayBufferDQN(DoubleDQN):
     def load_replay_buffer(
         self,
         path: Union[str, pathlib.Path, io.BufferedIOBase],
-        buffer: str = "secondary",
+        buffer: str = "primary",
     ) -> None:
         """
         Load a replay buffer from a pickle file.
 
         :param path: Path to the pickled replay buffer.
+        :param buffer: Which buffer to load the replay buffer into. Can be "primary" or "secondary".
         """
         if buffer == "primary":
             old_size = self.replay_buffer.primary_buffer.buffer_size
-        else:
+        elif buffer == "secondary":
             old_size = self.replay_buffer.secondary_buffer.buffer_size
+        else:
+            raise ValueError(
+                "Buffer must be 'primary' or 'secondary'"
+            )
 
         replay_buffer = load_from_pkl(path, self.verbose)
         assert isinstance(replay_buffer, ReplayBuffer), "The replay buffer must inherit from ReplayBuffer class"
