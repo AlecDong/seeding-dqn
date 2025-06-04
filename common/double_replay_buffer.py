@@ -63,39 +63,38 @@ class DoubleReplayBuffer:
             handle_timeout_termination,
         )
 
-        if psutil is not None:
-            mem_available = psutil.virtual_memory().available
+        mem_available = psutil.virtual_memory().available
 
-            obs_nbytes = 0
-            for _, obs in self.primary_buffer.observations.items():
-                obs_nbytes += obs.nbytes
-            for _, obs in self.secondary_buffer.observations.items():
-                obs_nbytes += obs.nbytes
+        obs_nbytes = 0
+        for _, obs in self.primary_buffer.observations.items():
+            obs_nbytes += obs.nbytes
+        for _, obs in self.secondary_buffer.observations.items():
+            obs_nbytes += obs.nbytes
 
-            total_memory_usage = (
-                obs_nbytes + 
-                self.primary_buffer.actions.nbytes +
-                self.primary_buffer.rewards.nbytes + 
-                self.primary_buffer.dones.nbytes +
-                self.secondary_buffer.actions.nbytes +
-                self.secondary_buffer.rewards.nbytes + 
-                self.secondary_buffer.dones.nbytes
+        total_memory_usage = (
+            obs_nbytes + 
+            self.primary_buffer.actions.nbytes +
+            self.primary_buffer.rewards.nbytes + 
+            self.primary_buffer.dones.nbytes +
+            self.secondary_buffer.actions.nbytes +
+            self.secondary_buffer.rewards.nbytes + 
+            self.secondary_buffer.dones.nbytes
+        )
+
+        if not optimize_memory_usage:
+            for _, obs in self.primary_buffer.next_observations.items():
+                total_memory_usage += obs.nbytes
+            for _, obs in self.secondary_buffer.next_observations.items():
+                total_memory_usage += obs.nbytes
+
+        if total_memory_usage > mem_available:
+            # Convert to GB
+            total_memory_usage /= 1e9
+            mem_available /= 1e9
+            warnings.warn(
+                "This system does not have apparently enough memory to store the complete "
+                f"replay buffers {total_memory_usage:.2f}GB > {mem_available:.2f}GB"
             )
-
-            if not optimize_memory_usage:
-                for _, obs in self.primary_buffer.next_observations.items():
-                    total_memory_usage += obs.nbytes
-                for _, obs in self.secondary_buffer.next_observations.items():
-                    total_memory_usage += obs.nbytes
-
-            if total_memory_usage > mem_available:
-                # Convert to GB
-                total_memory_usage /= 1e9
-                mem_available /= 1e9
-                warnings.warn(
-                    "This system does not have apparently enough memory to store the complete "
-                    f"replay buffers {total_memory_usage:.2f}GB > {mem_available:.2f}GB"
-                )
 
 
     def add(
